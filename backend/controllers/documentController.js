@@ -56,36 +56,35 @@ export const downloadDocument = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to access this file' });
     }
 
-    // If document has Cloudinary URL, generate a secure HTTPS download URL
+    // If document has Cloudinary URL, proxy it through backend to set download headers
     if (doc.cloudinaryUrl && doc.cloudinaryPublicId) {
       try {
-        // Ensure public_id includes folder path if it doesn't already
-        let publicId = doc.cloudinaryPublicId;
-        if (!publicId.includes('/')) {
-          publicId = `document-organizer/${publicId}`;
+        // Ensure the URL is HTTPS (convert http:// to https://)
+        let cloudinaryUrl = doc.cloudinaryUrl;
+        if (cloudinaryUrl && cloudinaryUrl.startsWith('http://')) {
+          cloudinaryUrl = cloudinaryUrl.replace('http://', 'https://');
         }
 
-        // Generate HTTPS URL explicitly with secure flag
-        const downloadUrl = cloudinary.url(publicId, {
-          resource_type: 'auto',
-          secure: true, // Force HTTPS
-          attachment: true,
-          flags: 'attachment:' + doc.originalName
-        });
-        
-        // Return URL as JSON to avoid CORS issues with redirects
-        // Frontend can then open/download the file directly
-        return res.json({ 
-          downloadUrl: downloadUrl,
-          filename: doc.originalName 
-        });
+        // Fetch the file from Cloudinary
+        const fileResponse = await fetch(cloudinaryUrl);
+        if (!fileResponse.ok) {
+          throw new Error('Failed to fetch file from Cloudinary');
+        }
+
+        // Get the file content
+        const fileBuffer = await fileResponse.arrayBuffer();
+        const contentType = doc.mimeType || fileResponse.headers.get('content-type') || 'application/octet-stream';
+
+        // Set headers to force download with correct filename
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${doc.originalName.replace(/"/g, '\\"')}"`);
+        res.setHeader('Content-Length', fileBuffer.byteLength);
+
+        // Send the file
+        return res.send(Buffer.from(fileBuffer));
       } catch (error) {
-        console.error('Error generating Cloudinary download URL:', error);
-        console.error('Document data:', { 
-          cloudinaryUrl: doc.cloudinaryUrl, 
-          cloudinaryPublicId: doc.cloudinaryPublicId 
-        });
-        // Fallback: return the stored Cloudinary URL directly, ensuring HTTPS
+        console.error('Error proxying file from Cloudinary:', error);
+        // Fallback: return URL as JSON
         let fallbackUrl = doc.cloudinaryUrl;
         if (fallbackUrl && fallbackUrl.startsWith('http://')) {
           fallbackUrl = fallbackUrl.replace('http://', 'https://');
