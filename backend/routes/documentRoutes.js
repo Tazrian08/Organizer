@@ -12,7 +12,6 @@ const storage = new CloudinaryStorage({
       folder: 'document-organizer',
       resource_type: 'auto',
       allowed_formats: ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'zip', 'rar'],
-      // public_id will be automatically prefixed with folder when folder is set
       public_id: `${Date.now()}-${Math.round(Math.random() * 1e9)}-${file.originalname.replace(/\.[^/.]+$/, '')}`
     };
   }
