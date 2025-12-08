@@ -19,6 +19,31 @@ export const getLists = async (req, res) => {
   return res.json(lists);
 };
 
+export const updateList = async (req, res) => {
+  const list = await List.findById(req.params.id);
+  if (!list) return res.status(404).json({ message: 'List not found' });
+
+  const isOwner = list.user.toString() === req.user._id.toString();
+  if (!isOwner && req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Not authorized to update this list' });
+  }
+
+  const { title, items = [] } = req.body;
+  if (!title) {
+    return res.status(400).json({ message: 'Title is required' });
+  }
+
+  const normalizedItems = Array.isArray(items)
+    ? items.filter(Boolean).map((text) => ({ text, done: false }))
+    : [];
+
+  list.title = title;
+  list.items = normalizedItems;
+  await list.save();
+
+  return res.json(list);
+};
+
 export const deleteList = async (req, res) => {
   const list = await List.findById(req.params.id);
   if (!list) return res.status(404).json({ message: 'List not found' });

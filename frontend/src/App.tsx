@@ -32,6 +32,7 @@ function App() {
   const [docForm, setDocForm] = useState({ title: '', category: 'other', description: '' });
   const [docFile, setDocFile] = useState<File | null>(null);
   const [listForm, setListForm] = useState({ title: '', items: '' });
+  const [editingListId, setEditingListId] = useState<string | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [lists, setLists] = useState<List[]>([]);
   const [loading, setLoading] = useState(false);
@@ -158,15 +159,39 @@ function App() {
       .map((i) => i.trim())
       .filter(Boolean);
     try {
-      const list = await handleApi<List>('/api/lists', {
-        method: 'POST',
-        body: JSON.stringify({ title: listForm.title, items })
-      });
-      setLists((prev) => [list, ...prev]);
+      if (editingListId) {
+        // Update existing list
+        const updatedList = await handleApi<List>(`/api/lists/${editingListId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ title: listForm.title, items })
+        });
+        setLists((prev) => prev.map((l) => (l._id === editingListId ? updatedList : l)));
+        setEditingListId(null);
+      } else {
+        // Create new list
+        const list = await handleApi<List>('/api/lists', {
+          method: 'POST',
+          body: JSON.stringify({ title: listForm.title, items })
+        });
+        setLists((prev) => [list, ...prev]);
+      }
       setListForm({ title: '', items: '' });
     } catch (err) {
       alert((err as Error).message);
     }
+  };
+
+  const editList = (list: List) => {
+    setListForm({
+      title: list.title,
+      items: list.items.map((item) => item.text).join('\n')
+    });
+    setEditingListId(list._id);
+  };
+
+  const cancelEdit = () => {
+    setListForm({ title: '', items: '' });
+    setEditingListId(null);
   };
 
   const downloadDoc = async (docId: string, filename: string) => {
@@ -505,12 +530,21 @@ function App() {
                   rows={3}
                 />
               </div>
-              <div className="md:col-span-2 flex justify-end">
+              <div className="md:col-span-2 flex justify-end gap-2">
+                {editingListId && (
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition"
+                  >
+                    Cancel
+                  </button>
+                )}
                 <button
                   type="submit"
                   className="rounded-lg bg-blue-600 px-4 py-2 text-white font-semibold hover:bg-blue-700 transition shadow-md shadow-blue-500/20"
                 >
-                  Save list
+                  {editingListId ? 'Update list' : 'Save list'}
                 </button>
               </div>
             </form>
@@ -524,13 +558,22 @@ function App() {
                       <h3 className="text-lg font-semibold">{l.title}</h3>
                       <p className="text-xs text-slate-500">{new Date(l.createdAt).toLocaleDateString()}</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => deleteList(l._id)}
-                      className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition"
-                    >
-                      Delete
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => editList(l)}
+                        className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50 transition"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteList(l._id)}
+                        className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                   <ul className="list-disc pl-5 space-y-1 text-sm text-slate-700">
                     {l.items.map((it, idx) => (
