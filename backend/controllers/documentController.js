@@ -41,23 +41,20 @@ export const downloadDocument = async (req, res) => {
     return res.status(403).json({ message: 'Not authorized to access this file' });
   }
 
-  // If document has Cloudinary URL, redirect to the stored secure URL (avoid mixed-content)
-  if (doc.cloudinaryUrl && doc.cloudinaryPublicId) {
+  // If document has Cloudinary public id, generate a secure, signed URL and redirect
+  if (doc.cloudinaryPublicId) {
     try {
-      // Use the stored URL (ensure https to avoid mixed content)
-      let redirectUrl = doc.cloudinaryUrl;
-      if (redirectUrl && redirectUrl.startsWith('http:')) {
-        redirectUrl = redirectUrl.replace(/^http:/, 'https:');
-      }
+      // derive extension from originalName if available
+      const ext = doc.originalName ? doc.originalName.split('.').pop() : undefined;
 
-      // If for some reason stored URL is missing or not HTTPS, build a secure URL
-      if (!redirectUrl) {
-        redirectUrl = cloudinary.url(doc.cloudinaryPublicId, {
-          resource_type: 'auto',
-          secure: true,
-          attachment: doc.originalName // force download filename
-        });
-      }
+      // Build a secure, signed URL (sign_url:true ensures access for private/authenticated assets)
+      const redirectUrl = cloudinary.url(doc.cloudinaryPublicId, {
+        resource_type: 'auto',
+        secure: true,
+        sign_url: true,
+        attachment: doc.originalName, // force download filename
+        ...(ext ? { format: ext } : {})
+      });
 
       return res.redirect(redirectUrl);
     } catch (error) {
