@@ -201,25 +201,15 @@ function App() {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Download failed');
-      
-      // Backend now returns JSON with downloadUrl
-      const data = await res.json();
-      const downloadUrl = data.downloadUrl || data.url;
-      
-      if (!downloadUrl) {
-        throw new Error('Download URL not available');
-      }
-      
-      // Open the Cloudinary URL directly in a new tab/window to trigger download
-      // This avoids CORS issues and mixed content problems
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = data.filename || filename;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
+      link.href = url;
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       alert((err as Error).message);
     }
