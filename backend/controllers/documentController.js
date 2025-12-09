@@ -105,20 +105,6 @@ export const downloadDocument = async (req, res) => {
   }
 };
 
-// Helper function to determine Cloudinary resource type from mimeType
-const getResourceType = (mimeType) => {
-  if (!mimeType) return 'raw'; // Default to raw for unknown types
-  
-  if (mimeType.startsWith('image/')) {
-    return 'image';
-  } else if (mimeType.startsWith('video/')) {
-    return 'video';
-  } else {
-    // For documents (pdf, doc, etc.), use 'raw'
-    return 'raw';
-  }
-};
-
 export const deleteDocument = async (req, res) => {
   try {
     const doc = await Document.findById(req.params.id);
@@ -138,16 +124,12 @@ export const deleteDocument = async (req, res) => {
           publicId = `document-organizer/${publicId}`;
         }
 
-        // Determine resource type from mimeType (auto is not supported for destroy)
-        const resourceType = getResourceType(doc.mimeType);
-
         await cloudinary.uploader.destroy(publicId, {
-          resource_type: resourceType
+          resource_type: 'auto'
         });
       } catch (error) {
         console.error('Error deleting from Cloudinary:', error);
         console.error('Document public_id:', doc.cloudinaryPublicId);
-        console.error('Document mimeType:', doc.mimeType);
         // Continue with database deletion even if Cloudinary deletion fails
       }
     }
