@@ -41,18 +41,25 @@ export const downloadDocument = async (req, res) => {
     return res.status(403).json({ message: 'Not authorized to access this file' });
   }
 
-  // If document has Cloudinary URL, generate a secure download URL
+  // If document has Cloudinary URL, redirect to the stored secure URL (avoid mixed-content)
   if (doc.cloudinaryUrl && doc.cloudinaryPublicId) {
     try {
-      // Generate a signed URL for secure download with attachment flag
-      const downloadUrl = cloudinary.url(doc.cloudinaryPublicId, {
-        resource_type: 'auto',
-        attachment: true,
-        flags: 'attachment:' + doc.originalName
-      });
-      
-      // Redirect to Cloudinary's secure download URL
-      return res.redirect(downloadUrl);
+      // Use the stored URL (ensure https to avoid mixed content)
+      let redirectUrl = doc.cloudinaryUrl;
+      if (redirectUrl && redirectUrl.startsWith('http:')) {
+        redirectUrl = redirectUrl.replace(/^http:/, 'https:');
+      }
+
+      // If for some reason stored URL is missing or not HTTPS, build a secure URL
+      if (!redirectUrl) {
+        redirectUrl = cloudinary.url(doc.cloudinaryPublicId, {
+          resource_type: 'auto',
+          secure: true,
+          attachment: doc.originalName // force download filename
+        });
+      }
+
+      return res.redirect(redirectUrl);
     } catch (error) {
       console.error('Error generating Cloudinary download URL:', error);
       return res.status(500).json({ message: 'Error generating download URL' });
